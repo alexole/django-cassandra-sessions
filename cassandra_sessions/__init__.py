@@ -3,13 +3,26 @@ import pycassa
 from django.conf import settings
 from django.utils.encoding import force_unicode
 from django.contrib.sessions.backends.base import SessionBase, CreateError
+from pycassa.system_manager import SystemManager
+from pycassa.cassandra.ttypes import NotFoundException
+from pycassa import types
 
 CASSANDRA_HOSTS = getattr(settings, 'CASSANDRA_HOSTS', ['localhost:9160',])
-CASSANDRA_SESSIONS_KEYSPACE = getattr(settings, 'CASSANDRA_SESSION_KEYSPACE', 'Keyspace1')
+CASSANDRA_SESSIONS_KEYSPACE = getattr(settings, 'CASSANDRA_SESSIONS_KEYSPACE', 'Keyspace1')
 CASSANDRA_SESSIONS_COLUMN_FAMILY = getattr(settings, 'CASSANDRA_SESSIONS_COLUMN_FAMILY', 'Standard1')
 
-pool = pycassa.connect(CASSANDRA_SESSIONS_KEYSPACE, CASSANDRA_HOSTS)
-session_cf = pycassa.ColumnFamily(pool, CASSANDRA_SESSIONS_COLUMN_FAMILY)
+pool = pycassa.ConnectionPool(CASSANDRA_SESSIONS_KEYSPACE, CASSANDRA_HOSTS)
+try:
+    session_cf = pycassa.ColumnFamily(pool, CASSANDRA_SESSIONS_COLUMN_FAMILY)
+except NotFoundException:
+    sys = SystemManager(server=CASSANDRA_HOSTS[0])
+    sys.create_column_family(CASSANDRA_SESSIONS_KEYSPACE, CASSANDRA_SESSIONS_COLUMN_FAMILY,
+                             key_validation_class=types.UTF8Type(),
+                             column_validation_classes={
+                                 'session_data': types.UTF8Type()
+                             })
+    sys.close()
+
 
 class SessionStore(SessionBase):
     """
@@ -25,7 +38,7 @@ class SessionStore(SessionBase):
 
     def create(self):
         while True:
-            self.session_key = self._get_new_session_key()
+            self._session_key = self._get_new_session_key()
             try:
                 self.save(must_create=True)
             except CreateError:
@@ -37,7 +50,7 @@ class SessionStore(SessionBase):
         if must_create and self.exists(self.session_key):
             raise CreateError
         session_data = self.encode(self._get_session(no_load=must_create))
-        session_cf.insert(self.session_key, {'session_data': session_data }, ttl=self.get_expiry_age())
+        session_cf.insert(self.session_key, {'session_data': session_data}, ttl=self.get_expiry_age())
 
     def exists(self, session_key):
         try:
