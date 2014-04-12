@@ -5,13 +5,15 @@ from django.utils.encoding import force_unicode
 from django.contrib.sessions.backends.base import SessionBase, CreateError
 from pycassa.system_manager import SystemManager
 from pycassa.cassandra.ttypes import NotFoundException
-from pycassa import types
+from pycassa import types, ConsistencyLevel
 
 CASSANDRA_HOSTS = getattr(settings, 'CASSANDRA_HOSTS', ['localhost:9160',])
 CASSANDRA_SESSIONS_KEYSPACE = getattr(settings, 'CASSANDRA_SESSIONS_KEYSPACE', 'Keyspace1')
 CASSANDRA_SESSIONS_COLUMN_FAMILY = getattr(settings, 'CASSANDRA_SESSIONS_COLUMN_FAMILY', 'Standard1')
 
 pool = pycassa.ConnectionPool(CASSANDRA_SESSIONS_KEYSPACE, CASSANDRA_HOSTS)
+pool.write_consistency_level = ConsistencyLevel.ALL
+
 try:
     session_cf = pycassa.ColumnFamily(pool, CASSANDRA_SESSIONS_COLUMN_FAMILY)
 except NotFoundException:
