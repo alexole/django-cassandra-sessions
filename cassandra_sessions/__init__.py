@@ -9,7 +9,8 @@ CASSANDRA_HOSTS = getattr(settings, 'CASSANDRA_HOSTS', ['localhost:9160',])
 CASSANDRA_SESSIONS_KEYSPACE = getattr(settings, 'CASSANDRA_SESSIONS_KEYSPACE', 'Keyspace1')
 CASSANDRA_SESSIONS_COLUMN_FAMILY = getattr(settings, 'CASSANDRA_SESSIONS_COLUMN_FAMILY', 'Standard1')
 
-pool = pycassa.ConnectionPool(CASSANDRA_SESSIONS_KEYSPACE, CASSANDRA_HOSTS)
+pool = pycassa.ConnectionPool(CASSANDRA_SESSIONS_KEYSPACE, CASSANDRA_HOSTS,
+                              credentials=dict(username=settings.CASSANDRA_USER, password=settings.CASSANDRA_PASSWORD))
 pool.write_consistency_level = ConsistencyLevel.ALL
 
 session_cf = pycassa.ColumnFamily(pool, CASSANDRA_SESSIONS_COLUMN_FAMILY)
